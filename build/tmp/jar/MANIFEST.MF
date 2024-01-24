@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Specification-Title: hmmanager
+Specification-Version: 1
+Implementation-Title: HMManager
+Implementation-Version: 1.16.5-1.0.0
+Implementation-Timestamp: 2023-10-20T15:20:07-0500
+

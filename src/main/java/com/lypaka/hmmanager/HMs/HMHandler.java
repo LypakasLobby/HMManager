@@ -1,12 +1,16 @@
 package com.lypaka.hmmanager.HMs;
 
 import com.google.common.reflect.TypeToken;
+import com.lypaka.areamanager.Areas.Area;
 import com.lypaka.hmmanager.API.CutEvent;
+import com.lypaka.hmmanager.API.DefogEvent;
 import com.lypaka.hmmanager.API.HMQueueEvent;
 import com.lypaka.hmmanager.ConfigGetters;
 import com.lypaka.hmmanager.HMManager;
 import com.lypaka.hmmanager.HMs.Cut.CutSettings;
 import com.lypaka.hmmanager.HMs.Cut.CutTree;
+import com.lypaka.hmmanager.HMs.Defog.DefogSettings;
+import com.lypaka.hmmanager.HMs.Defog.DefogSpot;
 import com.lypaka.lypakautils.ConfigurationLoaders.ComplexConfigManager;
 import com.lypaka.lypakautils.ConfigurationLoaders.ConfigUtils;
 import com.lypaka.lypakautils.FancyText;
@@ -16,34 +20,42 @@ import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
 import com.pixelmonmod.pixelmon.api.storage.StorageProxy;
 import com.pixelmonmod.pixelmon.battles.attacks.Attack;
 import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.potion.EffectInstance;
+import net.minecraft.potion.Effects;
 import net.minecraftforge.common.MinecraftForge;
 import ninja.leaping.configurate.objectmapping.ObjectMappingException;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class HMHandler {
 
     public static Map<String, HMSettings> settingsMap;
     public static Map<String, List<CutTree>> cutTreesByRegion;
+    public static Map<String, List<DefogSpot>> defogSpotsByRegion;
+    public static List<UUID> playersAffectedByDefog = new ArrayList<>();
+    public static Map<Area, List<UUID>> playersThatHaveClearedDefogInThisArea = new HashMap<>();
+    public static Map<UUID, Area> activeDefogAreas = new HashMap<>();
 
     public static void loadHMs() throws ObjectMappingException {
 
         settingsMap = new HashMap<>();
         cutTreesByRegion = new HashMap<>();
+        defogSpotsByRegion = new HashMap<>();
 
-        CutSettings settings = new CutSettings(ConfigGetters.cutBlockIDs, ConfigGetters.cutFiles, ConfigGetters.cutMessages.get("No-Permission"), ConfigGetters.cutMessages.get("Use"), ConfigGetters.cutPermission, ConfigGetters.cutRequired);
-        settingsMap.put("Cut", settings);
+        CutSettings cutSettings = new CutSettings(ConfigGetters.cutBlockIDs, ConfigGetters.cutFiles, ConfigGetters.cutMessages.get("No-Permission"), ConfigGetters.cutMessages.get("Use"), ConfigGetters.cutPermission, ConfigGetters.cutMoveRequired);
+        settingsMap.put("Cut", cutSettings);
+
+        DefogSettings defogSettings = new DefogSettings(ConfigGetters.defogFiles, ConfigGetters.defogMessages.get("No-Permission"), ConfigGetters.defogMessages.get("Use"), ConfigGetters.defogPermission, ConfigGetters.defogMoveRequired);
+        settingsMap.put("Defog", defogSettings);
 
         for (String region : com.lypaka.areamanager.ConfigGetters.regionNames) {
 
+            Path regionDir = ConfigUtils.checkDir(Paths.get("./config/hmmanager/" + region));
+
             /** CUT START */
             HMManager.logger.info("Loading Cut for region: " + region);
-            Path regionDir = ConfigUtils.checkDir(Paths.get("./config/hmmanager/" + region));
             ComplexConfigManager cutCCM = new ComplexConfigManager(ConfigGetters.cutFiles, "Cut", "cutTemplate.conf", regionDir, HMManager.class, HMManager.MOD_NAME, HMManager.MOD_ID, HMManager.logger);
             cutCCM.init();
             for (int i = 0; i < ConfigGetters.cutFiles.size(); i++) {
@@ -69,7 +81,94 @@ public class HMHandler {
             HMManager.logger.info("Finished loading Cut for region: " + region);
             /** CUT END */
 
+            /** DEFOG START */
+            HMManager.logger.info("Loading Defog for region: " + region);
+            ComplexConfigManager defogCCM = new ComplexConfigManager(ConfigGetters.defogFiles, "Defog", "defogTemplate.conf", regionDir, HMManager.class, HMManager.MOD_NAME, HMManager.MOD_ID, HMManager.logger);
+            defogCCM.init();
+            for (int i = 0 ; i < ConfigGetters.defogFiles.size(); i++) {
+
+                String areaName = defogCCM.getConfigNode(i, "Area-Name").getString();
+                int maxX = defogCCM.getConfigNode(i, "Location", "Max-X").getInt();
+                int maxY = defogCCM.getConfigNode(i, "Location", "Max-Y").getInt();
+                int maxZ = defogCCM.getConfigNode(i, "Location", "Max-Z").getInt();
+                int minX = defogCCM.getConfigNode(i, "Location", "Min-X").getInt();
+                int minY = defogCCM.getConfigNode(i, "Location", "Min-Y").getInt();
+                int minZ = defogCCM.getConfigNode(i, "Location", "Min-Z").getInt();
+                DefogSpot defogSpot = new DefogSpot(areaName, maxX, maxY, maxZ, minX, minY, minZ);
+                List<DefogSpot> spots = new ArrayList<>();
+                if (defogSpotsByRegion.containsKey(region)) {
+
+                    spots = defogSpotsByRegion.get(region);
+
+                }
+                spots.add(defogSpot);
+                defogSpotsByRegion.put(region, spots);
+
+            }
+
+            HMManager.logger.info("Finished loading Defog for region: " + region);
+            /** DEFOG END*/
+
         }
+
+    }
+
+    public static boolean passesHMRequirements (ServerPlayerEntity player, String hm, String region) {
+
+        boolean passesParty = true;
+        HMSettings settings = HMHandler.settingsMap.get(hm);
+        if (settings.doesRequireMove()) passesParty = false;
+
+        if (!passesParty) {
+
+            PlayerPartyStorage storage = StorageProxy.getParty(player);
+            for (Pokemon pokemon : storage.getTeam()) {
+
+                if (pokemon != null) {
+
+                    for (Attack attack : pokemon.getMoveset().attacks) {
+
+                        if (attack != null) {
+
+                            if (attack.getMove().getAttackName().equalsIgnoreCase(hm)) {
+
+                                passesParty = true;
+                                break;
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                if (passesParty) break;
+
+            }
+
+        }
+        boolean passesPermission = false;
+        if (!settings.getUniversalPermission().equalsIgnoreCase("")) {
+
+            if (PermissionHandler.hasPermission(player, settings.getUniversalPermission().replace("%region%", region.toLowerCase()))) {
+
+                passesPermission = true;
+
+            }
+
+        }
+
+        HMQueueEvent queueEvent = new HMQueueEvent(player, hm, passesParty, passesPermission);
+        MinecraftForge.EVENT_BUS.post(queueEvent);
+        boolean passes = true;
+        if (!queueEvent.isCanceled()) {
+
+            passes = queueEvent.doesPassPartyCheck() && queueEvent.doesPassPermissionCheck();
+
+        }
+
+        return passes;
 
     }
 
@@ -103,61 +202,9 @@ public class HMHandler {
 
         }
 
-        boolean passesParty = true;
+
         HMSettings settings = HMHandler.settingsMap.get("Cut");
-        if (settings.doesRequireMove()) passesParty = false;
-        String pokemonName = "N/A";
-
-        if (!passesParty) {
-
-            PlayerPartyStorage storage = StorageProxy.getParty(player);
-            for (Pokemon pokemon : storage.getTeam()) {
-
-                if (pokemon != null) {
-
-                    for (Attack attack : pokemon.getMoveset().attacks) {
-
-                        if (attack != null) {
-
-                            if (attack.getMove().getAttackName().equalsIgnoreCase("Cut")) {
-
-                                passesParty = true;
-                                pokemonName = pokemon.getSpecies().getName();
-                                break;
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                if (passesParty) break;
-
-            }
-
-        }
-        boolean passesPermission = false;
-        if (!settings.getUniversalPermission().equalsIgnoreCase("")) {
-
-            if (PermissionHandler.hasPermission(player, settings.getUniversalPermission().replace("%region%", region.toLowerCase()))) {
-
-                passesPermission = true;
-
-            }
-
-        }
-
-        HMQueueEvent queueEvent = new HMQueueEvent(player, "Cut", passesParty, passesPermission);
-        MinecraftForge.EVENT_BUS.post(queueEvent);
-        boolean passes = true;
-        if (!queueEvent.isCanceled()) {
-
-            passes = queueEvent.doesPassPartyCheck() && queueEvent.doesPassPermissionCheck();
-
-        }
-        if (passes) {
+        if (passesHMRequirements(player, "Cut", region)) {
 
             CutEvent event = new CutEvent(player, tree, teleportLocation);
             MinecraftForge.EVENT_BUS.post(event);
@@ -171,7 +218,9 @@ public class HMHandler {
                 player.setPositionAndUpdate(x, y, z);
                 if (!settings.getUseMessage().equalsIgnoreCase("")) {
 
-                    player.sendMessage(FancyText.getFormattedText(settings.getUseMessage().replace("%pokemon%", pokemonName)), player.getUniqueID());
+                    Pokemon pokemon = getPokemonUsingHM(player, "Cut");
+                    String name = pokemon == null ? "N/A" : pokemon.getSpecies().getName();
+                    player.sendMessage(FancyText.getFormattedText(settings.getUseMessage().replace("%pokemon%", name)), player.getUniqueID());
 
                 }
 
@@ -186,6 +235,106 @@ public class HMHandler {
             }
 
         }
+
+    }
+
+    private static Pokemon getPokemonUsingHM (ServerPlayerEntity player, String move) {
+
+        Pokemon user = null;
+        PlayerPartyStorage storage = StorageProxy.getParty(player);
+        for (Pokemon pokemon : storage.getTeam()) {
+
+            if (pokemon != null) {
+
+                for (Attack attack : pokemon.getMoveset().attacks) {
+
+                    if (attack != null) {
+
+                        if (attack.getMove().getAttackName().equalsIgnoreCase(move)) {
+
+                            user = pokemon;
+                            break;
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        return user;
+
+    }
+
+    public static void applyDefogBlindness (ServerPlayerEntity player, Area area) {
+
+        DefogEvent.Apply event = new DefogEvent.Apply(player, area);
+        MinecraftForge.EVENT_BUS.post(event);
+        if (!event.isCanceled()) {
+
+            player.addPotionEffect(new EffectInstance(Effects.BLINDNESS, 9999, 5, true, false));
+
+        }
+        playersAffectedByDefog.add(player.getUniqueID());
+        activeDefogAreas.put(player.getUniqueID(), area);
+
+    }
+
+    public static void removeDefogBlindness (ServerPlayerEntity player, Area area, String region, String cause) {
+
+        HMSettings settings = HMHandler.settingsMap.get("Defog");
+        playersAffectedByDefog.removeIf(entry -> {
+
+            if (entry.toString().equalsIgnoreCase(player.getUniqueID().toString())) {
+
+                boolean passes = passesHMRequirements(player, "Defog", region);
+                if (cause.equalsIgnoreCase("area leave")) passes = true; // player is not using Defog, they are leaving the area so there's no need to keep blinding them
+                if (passes) {
+
+                    DefogEvent.Remove removeEvent = new DefogEvent.Remove(player, area, cause);
+                    MinecraftForge.EVENT_BUS.post(removeEvent);
+                    if (!removeEvent.isCanceled()) {
+
+                        player.removePotionEffect(Effects.BLINDNESS);
+                        if (!settings.getUseMessage().equalsIgnoreCase("")) {
+
+                            Pokemon pokemon = getPokemonUsingHM(player, "Defog");
+                            String name = pokemon == null ? "N/A" : pokemon.getSpecies().getName();
+                            player.sendMessage(FancyText.getFormattedText(settings.getUseMessage().replace("%pokemon%", name)), player.getUniqueID());
+
+                        }
+                        return true;
+
+                    } else {
+
+                        if (!settings.getNoPermissionMessage().equalsIgnoreCase("")) {
+
+                            player.sendMessage(FancyText.getFormattedText(settings.getNoPermissionMessage()), player.getUniqueID());
+
+                        }
+                        return false;
+
+                    }
+
+                } else {
+
+                    if (!settings.getNoPermissionMessage().equalsIgnoreCase("")) {
+
+                        player.sendMessage(FancyText.getFormattedText(settings.getNoPermissionMessage()), player.getUniqueID());
+
+                    }
+                    return false;
+
+                }
+
+            }
+
+            return false;
+
+        });
 
     }
 
