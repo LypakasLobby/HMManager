@@ -4,6 +4,7 @@ import com.google.common.reflect.TypeToken;
 import com.lypaka.areamanager.Areas.Area;
 import com.lypaka.hmmanager.API.CutEvent;
 import com.lypaka.hmmanager.API.DefogEvent;
+import com.lypaka.hmmanager.API.DiveEvent;
 import com.lypaka.hmmanager.API.HMQueueEvent;
 import com.lypaka.hmmanager.ConfigGetters;
 import com.lypaka.hmmanager.HMManager;
@@ -11,17 +12,23 @@ import com.lypaka.hmmanager.HMs.Cut.CutSettings;
 import com.lypaka.hmmanager.HMs.Cut.CutTree;
 import com.lypaka.hmmanager.HMs.Defog.DefogSettings;
 import com.lypaka.hmmanager.HMs.Defog.DefogSpot;
+import com.lypaka.hmmanager.HMs.Dive.DiveSettings;
+import com.lypaka.hmmanager.HMs.Dive.DiveSpot;
 import com.lypaka.lypakautils.ConfigurationLoaders.ComplexConfigManager;
 import com.lypaka.lypakautils.ConfigurationLoaders.ConfigUtils;
 import com.lypaka.lypakautils.FancyText;
 import com.lypaka.lypakautils.MiscHandlers.PermissionHandler;
+import com.lypaka.lypakautils.MiscHandlers.WorldHelpers;
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
 import com.pixelmonmod.pixelmon.api.storage.StorageProxy;
 import com.pixelmonmod.pixelmon.battles.attacks.Attack;
+import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
+import com.pixelmonmod.pixelmon.enums.EnumGrowth;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.potion.EffectInstance;
 import net.minecraft.potion.Effects;
+import net.minecraft.world.server.ServerWorld;
 import net.minecraftforge.common.MinecraftForge;
 import ninja.leaping.configurate.objectmapping.ObjectMappingException;
 
@@ -34,6 +41,7 @@ public class HMHandler {
     public static Map<String, HMSettings> settingsMap;
     public static Map<String, List<CutTree>> cutTreesByRegion;
     public static Map<String, List<DefogSpot>> defogSpotsByRegion;
+    public static Map<String, List<DiveSpot>> diveSpotsByRegion;
     public static List<UUID> playersAffectedByDefog = new ArrayList<>();
     public static Map<Area, List<UUID>> playersThatHaveClearedDefogInThisArea = new HashMap<>();
     public static Map<UUID, Area> activeDefogAreas = new HashMap<>();
@@ -49,6 +57,9 @@ public class HMHandler {
 
         DefogSettings defogSettings = new DefogSettings(ConfigGetters.defogFiles, ConfigGetters.defogMessages.get("No-Permission"), ConfigGetters.defogMessages.get("Use"), ConfigGetters.defogPermission, ConfigGetters.defogMoveRequired);
         settingsMap.put("Defog", defogSettings);
+
+        DiveSettings diveSettings = new DiveSettings(ConfigGetters.diveBlockIDs, ConfigGetters.diveFiles, ConfigGetters.diveMessages.get("No-Permission"), ConfigGetters.diveMessages.get("Use"), ConfigGetters.divePermission, ConfigGetters.diveMoveRequired, ConfigGetters.diveMountForced);
+        settingsMap.put("Dive", diveSettings);
 
         for (String region : com.lypaka.areamanager.ConfigGetters.regionNames) {
 
@@ -107,7 +118,36 @@ public class HMHandler {
             }
 
             HMManager.logger.info("Finished loading Defog for region: " + region);
-            /** DEFOG END*/
+            /** DEFOG END */
+
+            /** DIVE START */
+            HMManager.logger.info("Loading Dive for region: " + region);
+            ComplexConfigManager diveCCM = new ComplexConfigManager(ConfigGetters.diveFiles, "Dive", "diveTemplate.conf", regionDir, HMManager.class, HMManager.MOD_NAME, HMManager.MOD_ID, HMManager.logger);
+            diveCCM.init();
+            for (int i = 0; i < ConfigGetters.diveFiles.size(); i++) {
+
+                String areaName = diveCCM.getConfigNode(i, "Area-Name").getString();
+                int maxX = diveCCM.getConfigNode(i, "Location", "Max-X").getInt();
+                int maxY = diveCCM.getConfigNode(i, "Location", "Max-Y").getInt();
+                int maxZ = diveCCM.getConfigNode(i, "Location", "Max-Z").getInt();
+                int minX = diveCCM.getConfigNode(i, "Location", "Min-X").getInt();
+                int minY = diveCCM.getConfigNode(i, "Location", "Min-Y").getInt();
+                int minZ = diveCCM.getConfigNode(i, "Location", "Min-Z").getInt();
+                String[] teleportLocation = diveCCM.getConfigNode(i, "Teleport-Location").getString().split(",");
+                DiveSpot diveSpot = new DiveSpot(areaName, maxX, maxY, maxZ, minX, minY, minZ, teleportLocation);
+                List<DiveSpot> spots = new ArrayList<>();
+                if (diveSpotsByRegion.containsKey(region)) {
+
+                    spots = diveSpotsByRegion.get(region);
+
+                }
+                spots.add(diveSpot);
+                diveSpotsByRegion.put(region, spots);
+
+            }
+
+            HMManager.logger.info("Finished loading Dive for region: " + region);
+            /** DIVE END */
 
         }
 
@@ -169,6 +209,50 @@ public class HMHandler {
         }
 
         return passes;
+
+    }
+
+    public static void useDive (ServerPlayerEntity player, DiveSpot spot, String region, Area area) {
+
+        boolean passes = passesHMRequirements(player, "Dive", region);
+        if (passes) {
+
+            DiveEvent event = new DiveEvent(player, spot, area);
+            MinecraftForge.EVENT_BUS.post(event);
+            if (!event.isCanceled()) {
+
+                String world = spot.getTeleportWorldName();
+                int x = spot.getTeleportX();
+                int y = spot.getTeleportY();
+                int z = spot.getTeleportZ();
+                WorldHelpers.teleportPlayer(player, world, x, y, z, player.cameraYaw, player.rotationPitch);
+                HMSettings settings = HMHandler.settingsMap.get("Dive");
+                if (!settings.getUseMessage().equalsIgnoreCase("")) {
+
+                    Pokemon pokemon = getPokemonUsingHM(player, "Dive");
+                    String name = pokemon == null ? "N/A" : pokemon.getSpecies().getName();
+                    player.sendMessage(FancyText.getFormattedText(settings.getUseMessage().replace("%pokemon%", name)), player.getUniqueID());
+                    DiveSettings diveSettings = (DiveSettings) HMHandler.settingsMap.get("Dive");
+                    if (diveSettings.doesForceMount()) {
+
+                        performAutomaticRemount(player, pokemon);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    private static void performAutomaticRemount (ServerPlayerEntity player, Pokemon pokemon) {
+
+        pokemon.setGrowth(EnumGrowth.Microscopic);
+        pokemon.getPersistentData().putBoolean("Catchable", false);
+        PixelmonEntity pixelmon = pokemon.getOrSpawnPixelmon(player.world, player.getPosX(), player.getPosY(), player.getPosZ());
+        player.startRiding(pixelmon, true);
 
     }
 

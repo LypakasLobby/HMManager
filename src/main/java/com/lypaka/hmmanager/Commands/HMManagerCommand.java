@@ -1,6 +1,7 @@
 package com.lypaka.hmmanager.Commands;
 
 import com.lypaka.hmmanager.Commands.HMCommands.DefogCommand;
+import com.lypaka.hmmanager.Commands.HMCommands.DiveCommand;
 import com.lypaka.hmmanager.HMManager;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -19,6 +20,7 @@ public class HMManagerCommand {
     public static void onCommandRegistration (RegisterCommandsEvent event) {
 
         new DefogCommand(event.getDispatcher());
+        new DiveCommand(event.getDispatcher());
 
         ConfigCommand.register(event.getDispatcher());
 
