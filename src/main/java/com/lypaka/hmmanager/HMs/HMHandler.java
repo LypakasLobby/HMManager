@@ -14,6 +14,7 @@ import com.lypaka.hmmanager.HMs.Defog.DefogSettings;
 import com.lypaka.hmmanager.HMs.Defog.DefogSpot;
 import com.lypaka.hmmanager.HMs.Dive.DiveSettings;
 import com.lypaka.hmmanager.HMs.Dive.DiveSpot;
+import com.lypaka.hmmanager.HMs.Flash.FlashSpot;
 import com.lypaka.lypakautils.ConfigurationLoaders.ComplexConfigManager;
 import com.lypaka.lypakautils.ConfigurationLoaders.ConfigUtils;
 import com.lypaka.lypakautils.FancyText;
@@ -42,6 +43,7 @@ public class HMHandler {
     public static Map<String, List<CutTree>> cutTreesByRegion;
     public static Map<String, List<DefogSpot>> defogSpotsByRegion;
     public static Map<String, List<DiveSpot>> diveSpotsByRegion;
+    public static Map<String, List<FlashSpot>> flashSpotsByRegion;
     public static List<UUID> playersAffectedByDefog = new ArrayList<>();
     public static Map<Area, List<UUID>> playersThatHaveClearedDefogInThisArea = new HashMap<>();
     public static Map<UUID, Area> activeDefogAreas = new HashMap<>();
@@ -51,6 +53,7 @@ public class HMHandler {
         settingsMap = new HashMap<>();
         cutTreesByRegion = new HashMap<>();
         defogSpotsByRegion = new HashMap<>();
+        flashSpotsByRegion = new HashMap<>();
 
         CutSettings cutSettings = new CutSettings(ConfigGetters.cutBlockIDs, ConfigGetters.cutFiles, ConfigGetters.cutMessages.get("No-Permission"), ConfigGetters.cutMessages.get("Use"), ConfigGetters.cutPermission, ConfigGetters.cutMoveRequired);
         settingsMap.put("Cut", cutSettings);
@@ -148,6 +151,35 @@ public class HMHandler {
 
             HMManager.logger.info("Finished loading Dive for region: " + region);
             /** DIVE END */
+
+            /** FLASH START */
+            HMManager.logger.info("Loading Flash for region: " + region);
+            ComplexConfigManager flashCCM = new ComplexConfigManager(ConfigGetters.flashFiles, "Flash", "flashTemplate.conf", regionDir, HMManager.class, HMManager.MOD_NAME, HMManager.MOD_ID, HMManager.logger);
+            flashCCM.init();
+            for (int i = 0; i < ConfigGetters.flashFiles.size(); i++) {
+
+                String areaName = flashCCM.getConfigNode(i, "Area-Name").getString();
+                int maxX = flashCCM.getConfigNode(i, "Location", "Max-X").getInt();
+                int maxY = flashCCM.getConfigNode(i, "Location", "Max-Y").getInt();
+                int maxZ = flashCCM.getConfigNode(i, "Location", "Max-Z").getInt();
+                int minX = flashCCM.getConfigNode(i, "Location", "Min-X").getInt();
+                int minY = flashCCM.getConfigNode(i, "Location", "Min-Y").getInt();
+                int minZ = flashCCM.getConfigNode(i, "Location", "Min-Z").getInt();
+
+                FlashSpot flashSpot = new FlashSpot(areaName, maxX, maxY, maxZ, minX, minY, minZ);
+                List<FlashSpot> spots = new ArrayList<>();
+                if (flashSpotsByRegion.containsKey(region)) {
+
+                    spots = flashSpotsByRegion.get(region);
+
+                }
+                spots.add(flashSpot);
+                flashSpotsByRegion.put(region, spots);
+
+            }
+
+            HMManager.logger.info("Finished loading Flash for region: " + region);
+            /** FLASH END */
 
         }
 

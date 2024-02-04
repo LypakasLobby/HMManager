@@ -26,6 +26,11 @@ public class ConfigGetters {
     public static boolean diveMoveRequired;
     public static boolean diveMountForced;
 
+    public static List<String> flashFiles;
+    public static Map<String, String> flashMessages;
+    public static String flashPermission;
+    public static boolean flashMoveRequired;
+
     public static void load() throws ObjectMappingException {
 
         cutBlockIDs = HMManager.configManager.getConfigNode(0, "Cut", "Block-IDs").getList(TypeToken.of(String.class));
@@ -45,6 +50,11 @@ public class ConfigGetters {
         divePermission = HMManager.configManager.getConfigNode(0, "Dive", "Permission").getString();
         diveMoveRequired = HMManager.configManager.getConfigNode(0, "Dive", "Require-Move").getBoolean();
         diveMountForced = HMManager.configManager.getConfigNode(0, "Dive", "Ride-Pokemon").getBoolean();
+
+        flashFiles = HMManager.configManager.getConfigNode(0, "Flash", "Files").getList(TypeToken.of(String.class));
+        flashMessages = HMManager.configManager.getConfigNode(0, "Flash", "Messages").getValue(new TypeToken<Map<String, String>>() {});
+        flashPermission = HMManager.configManager.getConfigNode(0, "Flash", "Permission").getString();
+        flashMoveRequired = HMManager.configManager.getConfigNode(0, "Flash", "Require-Move").getBoolean();
 
     }
 
