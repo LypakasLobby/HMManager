@@ -5,6 +5,7 @@ import com.lypaka.areamanager.Areas.Area;
 import com.lypaka.areamanager.Regions.RegionHandler;
 import com.lypaka.hmmanager.HMs.HMHandler;
 import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.potion.Effects;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class AreaLeaveListener {
@@ -21,6 +22,8 @@ public class AreaLeaveListener {
             HMHandler.playersThatHaveClearedDefogInThisArea.get(area).removeIf(entry -> entry.toString().equalsIgnoreCase(player.getUniqueID().toString()));
 
         }
+        HMHandler.playersWithFlashActive.removeIf(entry -> entry.toString().equalsIgnoreCase(player.getUniqueID().toString()));
+        player.removePotionEffect(Effects.NIGHT_VISION);
 
     }
 

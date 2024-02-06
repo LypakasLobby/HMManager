@@ -2,10 +2,7 @@ package com.lypaka.hmmanager.HMs;
 
 import com.google.common.reflect.TypeToken;
 import com.lypaka.areamanager.Areas.Area;
-import com.lypaka.hmmanager.API.CutEvent;
-import com.lypaka.hmmanager.API.DefogEvent;
-import com.lypaka.hmmanager.API.DiveEvent;
-import com.lypaka.hmmanager.API.HMQueueEvent;
+import com.lypaka.hmmanager.API.*;
 import com.lypaka.hmmanager.ConfigGetters;
 import com.lypaka.hmmanager.HMManager;
 import com.lypaka.hmmanager.HMs.Cut.CutSettings;
@@ -14,6 +11,7 @@ import com.lypaka.hmmanager.HMs.Defog.DefogSettings;
 import com.lypaka.hmmanager.HMs.Defog.DefogSpot;
 import com.lypaka.hmmanager.HMs.Dive.DiveSettings;
 import com.lypaka.hmmanager.HMs.Dive.DiveSpot;
+import com.lypaka.hmmanager.HMs.Flash.FlashSettings;
 import com.lypaka.hmmanager.HMs.Flash.FlashSpot;
 import com.lypaka.lypakautils.ConfigurationLoaders.ComplexConfigManager;
 import com.lypaka.lypakautils.ConfigurationLoaders.ConfigUtils;
@@ -47,6 +45,7 @@ public class HMHandler {
     public static List<UUID> playersAffectedByDefog = new ArrayList<>();
     public static Map<Area, List<UUID>> playersThatHaveClearedDefogInThisArea = new HashMap<>();
     public static Map<UUID, Area> activeDefogAreas = new HashMap<>();
+    public static List<UUID> playersWithFlashActive = new ArrayList<>();
 
     public static void loadHMs() throws ObjectMappingException {
 
@@ -244,6 +243,32 @@ public class HMHandler {
 
     }
 
+    public static void useFlash (ServerPlayerEntity player, FlashSpot spot, String region, Area area) {
+
+        boolean passes = passesHMRequirements(player, "Flash", region);
+        if (passes) {
+
+            FlashEvent event = new FlashEvent(player, spot, area);
+            MinecraftForge.EVENT_BUS.post(event);
+            if (!event.isCanceled()) {
+
+                HMSettings settings = HMHandler.settingsMap.get("Flash");
+                if (!settings.getUseMessage().equalsIgnoreCase("")) {
+
+                    Pokemon pokemon = getPokemonUsingHM(player, "Flash");
+                    String name = pokemon == null ? "N/A" : pokemon.getSpecies().getName();
+                    player.sendMessage(FancyText.getFormattedText(settings.getUseMessage().replace("%pokemon%", name)), player.getUniqueID());
+                    player.addPotionEffect(new EffectInstance(Effects.NIGHT_VISION, 9999, 10, true, false));
+                    playersWithFlashActive.add(player.getUniqueID());
+
+                }
+
+            }
+
+        }
+
+    }
+
     public static void useDive (ServerPlayerEntity player, DiveSpot spot, String region, Area area) {
 
         boolean passes = passesHMRequirements(player, "Dive", region);
@@ -396,6 +421,12 @@ public class HMHandler {
         }
         playersAffectedByDefog.add(player.getUniqueID());
         activeDefogAreas.put(player.getUniqueID(), area);
+
+    }
+
+    public static void removeFlashNightVision (ServerPlayerEntity player, Area area, String region, String cause) {
+
+
 
     }
 
