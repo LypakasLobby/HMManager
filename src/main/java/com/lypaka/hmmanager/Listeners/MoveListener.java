@@ -4,10 +4,16 @@ import com.lypaka.areamanager.Areas.Area;
 import com.lypaka.areamanager.Areas.AreaHandler;
 import com.lypaka.areamanager.Regions.Region;
 import com.lypaka.areamanager.Regions.RegionHandler;
+import com.lypaka.hmmanager.ConfigGetters;
 import com.lypaka.hmmanager.HMManager;
 import com.lypaka.hmmanager.HMs.Defog.DefogSpot;
+import com.lypaka.hmmanager.HMs.Fly.FlyArea;
 import com.lypaka.hmmanager.HMs.HMHandler;
 import com.lypaka.lypakautils.API.PlayerMovementEvent;
+import com.lypaka.lypakautils.LPPlayer;
+import com.lypaka.lypakautils.LypakaUtils;
+import com.lypaka.lypakautils.MiscHandlers.PermissionHandler;
+import com.lypaka.lypakautils.WorldStuff.WorldMap;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -58,6 +64,71 @@ public class MoveListener {
 
                                     HMHandler.applyDefogBlindness(player, area);
                                     return;
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+        if (HMHandler.flyAreasByRegion.containsKey(region.getName())) {
+
+            String worldName = WorldMap.getWorldName(player);
+            int x = player.getPosition().getX();
+            int y = player.getPosition().getY();
+            int z = player.getPosition().getZ();
+            List<FlyArea> flyAreas = HMHandler.flyAreasByRegion.get(region.getName());
+            for (Area area : areas) {
+
+                for (FlyArea flyArea : flyAreas) {
+
+                    if (flyArea.getUnlockLocationsByMovement().size() > 0) {
+
+                        if (area.getName().equalsIgnoreCase(flyArea.getAreaName())) {
+
+                            String permission = ConfigGetters.flyPermission.replace("%region%", region.getName().toLowerCase()) + "." + area.getName().toLowerCase();
+                            if (!PermissionHandler.hasPermission(player, permission)) {
+
+                                boolean atLocation = false;
+                                for (String location : flyArea.getUnlockLocationsByMovement()) {
+
+                                    String locationWorld = location.split(",")[0];
+                                    int locationX = Integer.parseInt(location.split(",")[1]);
+                                    int locationY = Integer.parseInt(location.split(",")[2]);
+                                    int locationZ = Integer.parseInt(location.split(",")[3]);
+                                    if (locationWorld.equalsIgnoreCase(worldName)) {
+
+                                        if (locationX == x) {
+
+                                            if (locationY == y) {
+
+                                                if (locationZ == z) {
+
+                                                    atLocation = true;
+                                                    break;
+
+                                                }
+
+                                            }
+
+                                        }
+
+                                    }
+
+                                }
+                                if (atLocation) {
+
+                                    LPPlayer lpPlayer = LypakaUtils.playerMap.get(player.getUniqueID());
+                                    lpPlayer.addPermission(permission);
+                                    lpPlayer.save(false);
+                                    break;
 
                                 }
 

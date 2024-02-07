@@ -13,6 +13,8 @@ import com.lypaka.hmmanager.HMs.Dive.DiveSettings;
 import com.lypaka.hmmanager.HMs.Dive.DiveSpot;
 import com.lypaka.hmmanager.HMs.Flash.FlashSettings;
 import com.lypaka.hmmanager.HMs.Flash.FlashSpot;
+import com.lypaka.hmmanager.HMs.Fly.FlyArea;
+import com.lypaka.hmmanager.HMs.Fly.FlySettings;
 import com.lypaka.lypakautils.ConfigurationLoaders.ComplexConfigManager;
 import com.lypaka.lypakautils.ConfigurationLoaders.ConfigUtils;
 import com.lypaka.lypakautils.FancyText;
@@ -42,6 +44,7 @@ public class HMHandler {
     public static Map<String, List<DefogSpot>> defogSpotsByRegion;
     public static Map<String, List<DiveSpot>> diveSpotsByRegion;
     public static Map<String, List<FlashSpot>> flashSpotsByRegion;
+    public static Map<String, List<FlyArea>> flyAreasByRegion;
     public static List<UUID> playersAffectedByDefog = new ArrayList<>();
     public static Map<Area, List<UUID>> playersThatHaveClearedDefogInThisArea = new HashMap<>();
     public static Map<UUID, Area> activeDefogAreas = new HashMap<>();
@@ -53,6 +56,7 @@ public class HMHandler {
         cutTreesByRegion = new HashMap<>();
         defogSpotsByRegion = new HashMap<>();
         flashSpotsByRegion = new HashMap<>();
+        flyAreasByRegion = new HashMap<>();
 
         CutSettings cutSettings = new CutSettings(ConfigGetters.cutBlockIDs, ConfigGetters.cutFiles, ConfigGetters.cutMessages.get("No-Permission"), ConfigGetters.cutMessages.get("Use"), ConfigGetters.cutPermission, ConfigGetters.cutMoveRequired);
         settingsMap.put("Cut", cutSettings);
@@ -62,6 +66,12 @@ public class HMHandler {
 
         DiveSettings diveSettings = new DiveSettings(ConfigGetters.diveBlockIDs, ConfigGetters.diveFiles, ConfigGetters.diveMessages.get("No-Permission"), ConfigGetters.diveMessages.get("Use"), ConfigGetters.divePermission, ConfigGetters.diveMoveRequired, ConfigGetters.diveMountForced);
         settingsMap.put("Dive", diveSettings);
+
+        FlashSettings flashSettings = new FlashSettings(ConfigGetters.flashFiles, ConfigGetters.flashMessages.get("No-Permission"), ConfigGetters.flashMessages.get("Use"), ConfigGetters.flashPermission, ConfigGetters.flashMoveRequired);
+        settingsMap.put("Flash", flashSettings);
+
+        FlySettings flySettings = new FlySettings(ConfigGetters.flyFiles, ConfigGetters.flyMessages.get("No-Permission"), ConfigGetters.flyMessages.get("Use"), ConfigGetters.flyPermission, ConfigGetters.flyMoveRequired);
+        settingsMap.put("Fly", flySettings);
 
         for (String region : com.lypaka.areamanager.ConfigGetters.regionNames) {
 
@@ -179,6 +189,31 @@ public class HMHandler {
 
             HMManager.logger.info("Finished loading Flash for region: " + region);
             /** FLASH END */
+
+            /** FLY START */
+            HMManager.logger.info("Loading Fly for region: " + region);
+            ComplexConfigManager flyCCM = new ComplexConfigManager(ConfigGetters.flyFiles, "Fly", "flyTemplate.conf", regionDir, HMManager.class, HMManager.MOD_NAME, HMManager.MOD_ID, HMManager.logger);
+            flyCCM.init();
+            for (int i = 0; i < ConfigGetters.flyFiles.size(); i++) {
+
+                String areaName = flyCCM.getConfigNode(i, "Area-Name").getString();
+                Map<String, String> unlockLocations = flyCCM.getConfigNode(i, "Locations").getValue(new TypeToken<Map<String, String>>() {});
+                String[] teleportLocation = flyCCM.getConfigNode(i, "Teleport").getString().split(",");
+
+                FlyArea flyArea = new FlyArea(areaName, unlockLocations, teleportLocation);
+                List<FlyArea> flyAreas = new ArrayList<>();
+                if (flyAreasByRegion.containsKey(region)) {
+
+                    flyAreas = flyAreasByRegion.get(region);
+
+                }
+                flyAreas.add(flyArea);
+                flyAreasByRegion.put(region, flyAreas);
+
+            }
+
+            HMManager.logger.info("Finished loading Fly for region: " + region);
+            /** FLY END */
 
         }
 

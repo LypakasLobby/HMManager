@@ -31,6 +31,11 @@ public class ConfigGetters {
     public static String flashPermission;
     public static boolean flashMoveRequired;
 
+    public static List<String> flyFiles;
+    public static Map<String, String> flyMessages;
+    public static String flyPermission;
+    public static boolean flyMoveRequired;
+
     public static void load() throws ObjectMappingException {
 
         cutBlockIDs = HMManager.configManager.getConfigNode(0, "Cut", "Block-IDs").getList(TypeToken.of(String.class));
@@ -55,6 +60,11 @@ public class ConfigGetters {
         flashMessages = HMManager.configManager.getConfigNode(0, "Flash", "Messages").getValue(new TypeToken<Map<String, String>>() {});
         flashPermission = HMManager.configManager.getConfigNode(0, "Flash", "Permission").getString();
         flashMoveRequired = HMManager.configManager.getConfigNode(0, "Flash", "Require-Move").getBoolean();
+
+        flyFiles = HMManager.configManager.getConfigNode(0, "Fly", "Files").getList(TypeToken.of(String.class));
+        flyMessages = HMManager.configManager.getConfigNode(0, "Fly", "Messages").getValue(new TypeToken<Map<String, String>>() {});
+        flyPermission = HMManager.configManager.getConfigNode(0, "Fly", "Permission").getString();
+        flyMoveRequired = HMManager.configManager.getConfigNode(0, "Fly", "Require-Move").getBoolean();
 
     }
 

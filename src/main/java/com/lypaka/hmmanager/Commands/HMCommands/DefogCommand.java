@@ -4,7 +4,10 @@ import com.lypaka.areamanager.Areas.Area;
 import com.lypaka.areamanager.Areas.AreaHandler;
 import com.lypaka.areamanager.Regions.Region;
 import com.lypaka.areamanager.Regions.RegionHandler;
+import com.lypaka.hmmanager.ConfigGetters;
 import com.lypaka.hmmanager.HMs.HMHandler;
+import com.lypaka.lypakautils.FancyText;
+import com.lypaka.lypakautils.MiscHandlers.PermissionHandler;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
@@ -33,6 +36,12 @@ public class DefogCommand {
 
                                         Region region = RegionHandler.getRegionAtPlayer(player);
                                         if (region == null) return 1;
+                                        if (!PermissionHandler.hasPermission(player, ConfigGetters.defogPermission.replace("%region%", region.getName().toLowerCase()))) {
+
+                                            player.sendMessage(FancyText.getFormattedText("&cYou don't have permission to use this HM!"), player.getUniqueID());
+                                            return 1;
+
+                                        }
                                         List<Area> areas = AreaHandler.getAreasAtPlayer(player);
                                         if (areas.size() == 0) return 1;
 
