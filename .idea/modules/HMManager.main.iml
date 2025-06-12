@@ -8,11 +8,12 @@
           <platformType>MIXIN</platformType>
           <platformType>MCP</platformType>
         </autoDetectTypes>
+        <projectReimportVersion>1</projectReimportVersion>
       </configuration>
     </facet>
   </component>
   <component name="McpModuleSettings">
-    <option name="mappingFile" value="C:\Users\ryan9\Documents\GitHub\HMManager\build\createMcpToSrg\output.tsrg" />
+    <option name="mappingFile" value="D:\GitHub\HMManager\build\createMcpToSrg\output.tsrg" />
     <option name="mcpVersion" value="snapshot_20210309-1.16.5" />
     <option name="minecraftVersion" value="1.16.5" />
     <option name="platformVersion" value="36.2.39" />
